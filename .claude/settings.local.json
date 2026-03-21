@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check claude/generate_system_prompt.js)",
+      "Bash(node --check claude/build_context.js)",
+      "Bash(node --check webhooks/webhook_whatsapp.js)",
+      "Bash(node --check claude/merchant_cache.js)",
+      "Bash(node --check tests/test_sprint2.js)",
+      "Bash(node tests/test_sprint2.js)",
+      "Bash(node --check claude/intent_detector.js)",
+      "Bash(node --check claude/message_handler.js)",
+      "Bash(node --check webhooks/webhook_instagram.js)",
+      "Bash(node --check index.js)",
+      "Bash(node --check tests/test_sprint3.js)",
+      "Bash(node tests/test_sprint3.js)",
+      "Bash(node --check calendar/google_auth.js)",
+      "Bash(node --check calendar/create_event.js)",
+      "Bash(node --check calendar/save_reservation.js)",
+      "Bash(node --check notifications/send_confirmation.js)",
+      "Bash(node --check scripts/google_oauth_setup.js)",
+      "Bash(node --check tests/test_sprint4.js)",
+      "Bash(node tests/test_sprint4.js)",
+      "Bash(npm install:*)",
+      "Bash(node scripts/add_notification_table.js)",
+      "Bash(node tests/test_sprint5.js)"
+    ]
+  }
+}
