@@ -22,7 +22,9 @@
       "Bash(node tests/test_sprint4.js)",
       "Bash(npm install:*)",
       "Bash(node scripts/add_notification_table.js)",
-      "Bash(node tests/test_sprint5.js)"
+      "Bash(node tests/test_sprint5.js)",
+      "Bash(node tests/test_sprint6.js)",
+      "Bash(node tests/run_all.js)"
     ]
   }
 }

@@ -11,6 +11,8 @@ const { createReservationEvent }                    = require('../calendar/creat
 const { saveReservation }                           = require('../calendar/save_reservation');
 const { sendReservationConfirmation }               = require('../notifications/send_confirmation');
 const { sendPushAlert }                             = require('../notifications/push_alert');
+// Import du module complet (non destructuré) pour permettre le mock dans les tests
+const stripeCheck                                   = require('../payments/stripe_check');
 
 /**
  * Flux complet de traitement d'un message entrant (WhatsApp ou Instagram).
@@ -27,6 +29,17 @@ const { sendPushAlert }                             = require('../notifications/
  * @returns {Promise<{ responseText: string, cleanedText: string, conversationId: string }>}
  */
 async function handleMessage({ merchantId, merchant, customerPhone, messageText, channel, sendFunction, phoneNumberId }) {
+  // 0. Vérifier que l'abonnement Stripe est actif
+  const isActive = await stripeCheck.isMerchantActive(merchant);
+  if (!isActive) {
+    await sendFunction(phoneNumberId, customerPhone, 'Ce service est temporairement suspendu.');
+    console.log(JSON.stringify({
+      event:      'merchant_suspended',
+      merchantId,
+    }));
+    return { responseText: '', cleanedText: '', conversationId: null };
+  }
+
   // 1. Récupérer ou créer la conversation
   const conversationId = await getOrCreateConversation(merchantId, customerPhone, channel);
 

@@ -4,9 +4,19 @@
   "description": "SaaS B2B chatbot IA pour commerces locaux — WhatsApp & Instagram",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "migrate": "node scripts/run_migrations.js"
+    "start":           "node index.js",
+    "dev":             "nodemon index.js",
+    "test":            "node tests/run_all.js",
+    "test:sprint1":    "node tests/test_sprint1.js",
+    "test:sprint2":    "node tests/test_sprint2.js",
+    "test:sprint3":    "node tests/test_sprint3.js",
+    "test:sprint4":    "node tests/test_sprint4.js",
+    "test:sprint5":    "node tests/test_sprint5.js",
+    "test:sprint6":    "node tests/test_sprint6.js",
+    "migrate":         "node scripts/run_migrations.js",
+    "deploy:check":    "node scripts/deploy_checklist.js",
+    "setup:google":    "node scripts/google_oauth_setup.js",
+    "create:merchant": "node scripts/create_test_merchant.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
