@@ -32,7 +32,7 @@ function isValidSignature(rawBody, signature) {
   const secretKey  = process.env.INSTAGRAM_APP_SECRET ? 'INSTAGRAM_APP_SECRET' : 'META_APP_SECRET';
   const secret     = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
   if (!signature || !secret) {
-    console.warn(JSON.stringify({ event: 'instagram_signature_missing', hasSignature: !!signature, hasSecret: !!secret }));
+    console.log(JSON.stringify({ event: 'instagram_signature_missing', hasSignature: !!signature, hasSecret: !!secret }));
     return false;
   }
 
@@ -56,13 +56,13 @@ function isValidSignature(rawBody, signature) {
     const expBuf = Buffer.from(expected);
 
     if (sigBuf.length !== expBuf.length) {
-      console.warn(JSON.stringify({ event: 'instagram_signature_length_mismatch', sigLen: sigBuf.length, expLen: expBuf.length }));
+      console.log(JSON.stringify({ event: 'instagram_signature_length_mismatch', sigLen: sigBuf.length, expLen: expBuf.length }));
       return false;
     }
 
     return crypto.timingSafeEqual(expBuf, sigBuf);
   } catch (err) {
-    console.warn(JSON.stringify({ event: 'instagram_signature_error', error: err.message }));
+    console.log(JSON.stringify({ event: 'instagram_signature_error', error: err.message }));
     return false;
   }
 }
@@ -151,7 +151,7 @@ router.post('/instagram', (req, res) => {
   console.log(JSON.stringify({ event: 'instagram_post_received', hasRawBody: !!rawBody, hasSignature: !!signature }));
 
   if (!isValidSignature(rawBody, signature)) {
-    console.warn(JSON.stringify({ event: 'instagram_invalid_signature' }));
+    console.log(JSON.stringify({ event: 'instagram_invalid_signature' }));
     return res.sendStatus(403);
   }
 
@@ -162,7 +162,7 @@ router.post('/instagram', (req, res) => {
       const body = req.body;
 
       if (body.object !== 'instagram') {
-        console.warn(JSON.stringify({ event: 'instagram_wrong_object', object: body.object }));
+        console.log(JSON.stringify({ event: 'instagram_wrong_object', object: body.object }));
         return;
       }
 
