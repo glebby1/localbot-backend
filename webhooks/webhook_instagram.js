@@ -166,6 +166,8 @@ router.post('/instagram', (req, res) => {
         return;
       }
 
+      console.log(JSON.stringify({ event: 'instagram_payload_structure', entryCount: body.entry?.length, firstEntryKeys: Object.keys(body.entry?.[0] || {}) }));
+
       for (const entry of (body.entry || [])) {
         const instagramPageId = entry.id;
 
