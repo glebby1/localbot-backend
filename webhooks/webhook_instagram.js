@@ -31,7 +31,10 @@ function isValidSignature(rawBody, signature) {
 
   const secretKey  = process.env.INSTAGRAM_APP_SECRET ? 'INSTAGRAM_APP_SECRET' : 'META_APP_SECRET';
   const secret     = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
-  if (!signature || !secret) return false;
+  if (!signature || !secret) {
+    console.warn(JSON.stringify({ event: 'instagram_signature_missing', hasSignature: !!signature, hasSecret: !!secret }));
+    return false;
+  }
 
   try {
     const expected = 'sha256=' + crypto
@@ -136,6 +139,8 @@ router.post('/instagram', (req, res) => {
   const signature = req.headers['x-hub-signature-256'];
   const rawBody   = req.rawBody;
 
+  console.log(JSON.stringify({ event: 'instagram_post_received', hasRawBody: !!rawBody, hasSignature: !!signature }));
+
   if (!isValidSignature(rawBody, signature)) {
     console.warn(JSON.stringify({ event: 'instagram_invalid_signature' }));
     return res.sendStatus(403);
@@ -147,7 +152,10 @@ router.post('/instagram', (req, res) => {
     try {
       const body = req.body;
 
-      if (body.object !== 'instagram') return;
+      if (body.object !== 'instagram') {
+        console.warn(JSON.stringify({ event: 'instagram_wrong_object', object: body.object }));
+        return;
+      }
 
       for (const entry of (body.entry || [])) {
         const instagramPageId = entry.id;
