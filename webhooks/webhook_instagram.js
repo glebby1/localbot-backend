@@ -23,14 +23,32 @@ function purgeExpiredMessages() {
 // ── Validation de signature ────────────────────────────────────────────────────
 
 function isValidSignature(rawBody, signature) {
-  if (process.env.NODE_ENV !== 'production') return true;
-  const secret = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
+  // Bypass temporaire pour débogage (SKIP_SIGNATURE_CHECK=true dans Railway)
+  if (process.env.SKIP_SIGNATURE_CHECK === 'true') {
+    console.warn(JSON.stringify({ event: 'signature_check_skipped', channel: 'instagram' }));
+    return true;
+  }
+
+  const secretKey  = process.env.INSTAGRAM_APP_SECRET ? 'INSTAGRAM_APP_SECRET' : 'META_APP_SECRET';
+  const secret     = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
   if (!signature || !secret) return false;
+
   try {
     const expected = 'sha256=' + crypto
       .createHmac('sha256', secret)
       .update(rawBody)
       .digest('hex');
+
+    if (process.env.DEBUG_SIGNATURE === 'true') {
+      console.log(JSON.stringify({
+        event:            'signature_debug',
+        channel:          'instagram',
+        secretUsed:       secretKey,
+        receivedPrefix:   signature.substring(0, 20),
+        expectedPrefix:   expected.substring(0, 20),
+      }));
+    }
+
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
   } catch {
     return false;

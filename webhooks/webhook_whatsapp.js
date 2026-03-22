@@ -38,6 +38,12 @@ function purgeExpiredMessages() {
  * @returns {boolean}
  */
 function isValidSignature(rawBody, signature) {
+  // Bypass temporaire pour débogage (SKIP_SIGNATURE_CHECK=true dans Railway)
+  if (process.env.SKIP_SIGNATURE_CHECK === 'true') {
+    console.warn(JSON.stringify({ event: 'signature_check_skipped', channel: 'whatsapp' }));
+    return true;
+  }
+
   if (!signature || !process.env.META_APP_SECRET) return false;
 
   try {
@@ -45,6 +51,16 @@ function isValidSignature(rawBody, signature) {
       .createHmac('sha256', process.env.META_APP_SECRET)
       .update(rawBody)
       .digest('hex');
+
+    if (process.env.DEBUG_SIGNATURE === 'true') {
+      console.log(JSON.stringify({
+        event:          'signature_debug',
+        channel:        'whatsapp',
+        secretUsed:     'META_APP_SECRET',
+        receivedPrefix: signature.substring(0, 20),
+        expectedPrefix: expected.substring(0, 20),
+      }));
+    }
 
     // timingSafeEqual exige deux buffers de même longueur
     return crypto.timingSafeEqual(
