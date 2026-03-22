@@ -4,8 +4,9 @@ require('dotenv').config();
 const express            = require('express');
 const webhookWhatsapp    = require('./webhooks/webhook_whatsapp');
 const webhookInstagram   = require('./webhooks/webhook_instagram');
-const { router: stripeRouter }    = require('./api/stripe_webhook');
-const { router: dashboardRouter } = require('./api/dashboard');
+const { router: stripeRouter }        = require('./api/stripe_webhook');
+const { router: dashboardRouter }     = require('./api/dashboard');
+const { router: instagramOAuthRouter } = require('./api/instagram_oauth');
 const { startScheduler } = require('./scheduler');
 const { errorHandler }   = require('./utils/error_handler');
 const logger             = require('./utils/logger');
@@ -28,7 +29,26 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/webhook/whatsapp', webhookWhatsapp.router || webhookWhatsapp);
 app.use('/webhook',          webhookInstagram.router);
 app.use('/api/stripe',       stripeRouter);
+app.use('/api/instagram',    instagramOAuthRouter);
 app.use('/api',              dashboardRouter);
+
+// Politique de confidentialité — requise par Meta pour le mode Live
+app.get('/privacy', (req, res) => {
+  res.send(`
+<!DOCTYPE html>
+<html lang="fr">
+<body style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 24px;">
+  <h1>Politique de confidentialité — LocalBot</h1>
+  <p>LocalBot collecte uniquement les messages nécessaires
+  au traitement des demandes des clients.</p>
+  <p>Les données sont stockées de façon sécurisée sur des
+  serveurs européens et ne sont jamais partagées avec des tiers.</p>
+  <p>Les données sont conservées 12 mois maximum.</p>
+  <p>Contact : contact@localbot.fr</p>
+</body>
+</html>
+  `);
+});
 
 // Healthcheck — utilisé par les outils de monitoring et déploiement
 app.get('/health', async (req, res) => {

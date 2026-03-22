@@ -16,7 +16,8 @@
     "migrate":         "node scripts/run_migrations.js",
     "deploy:check":    "node scripts/deploy_checklist.js",
     "setup:google":    "node scripts/google_oauth_setup.js",
-    "create:merchant": "node scripts/create_test_merchant.js"
+    "create:merchant":  "node scripts/create_test_merchant.js",
+    "update:merchant":  "node scripts/update_test_merchant.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
