@@ -23,10 +23,11 @@ function purgeExpiredMessages() {
 // ── Validation de signature ────────────────────────────────────────────────────
 
 function isValidSignature(rawBody, signature) {
-  if (!signature || !process.env.META_APP_SECRET) return false;
+  const secret = process.env.INSTAGRAM_APP_SECRET || process.env.META_APP_SECRET;
+  if (!signature || !secret) return false;
   try {
     const expected = 'sha256=' + crypto
-      .createHmac('sha256', process.env.META_APP_SECRET)
+      .createHmac('sha256', secret)
       .update(rawBody)
       .digest('hex');
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
