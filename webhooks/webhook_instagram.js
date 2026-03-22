@@ -52,8 +52,17 @@ function isValidSignature(rawBody, signature) {
       }));
     }
 
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-  } catch {
+    const sigBuf = Buffer.from(signature.trim());
+    const expBuf = Buffer.from(expected);
+
+    if (sigBuf.length !== expBuf.length) {
+      console.warn(JSON.stringify({ event: 'instagram_signature_length_mismatch', sigLen: sigBuf.length, expLen: expBuf.length }));
+      return false;
+    }
+
+    return crypto.timingSafeEqual(expBuf, sigBuf);
+  } catch (err) {
+    console.warn(JSON.stringify({ event: 'instagram_signature_error', error: err.message }));
     return false;
   }
 }
