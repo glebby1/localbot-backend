@@ -172,6 +172,12 @@ router.post('/instagram', (req, res) => {
         const instagramPageId = entry.id;
 
         for (const messaging of (entry.messaging || [])) {
+          // Ignorer les echos (messages envoyés par le bot lui-même)
+          if (messaging.message?.is_echo) {
+            console.log(JSON.stringify({ event: 'instagram_echo_ignored', messageId: messaging.message?.mid }));
+            continue;
+          }
+
           // Ignorer les messages sans texte (likes, stickers, etc.)
           if (!messaging.message?.text) {
             console.log(JSON.stringify({
