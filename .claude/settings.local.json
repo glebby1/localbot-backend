@@ -24,7 +24,10 @@
       "Bash(node scripts/add_notification_table.js)",
       "Bash(node tests/test_sprint5.js)",
       "Bash(node tests/test_sprint6.js)",
-      "Bash(node tests/run_all.js)"
+      "Bash(node tests/run_all.js)",
+      "Bash(node scripts/update_test_merchant.js)",
+      "Read(//c/Users/Chauchaix/Desktop/dev/**)",
+      "Bash(npm create:*)"
     ]
   }
 }

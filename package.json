@@ -14,10 +14,12 @@
     "test:sprint5":    "node tests/test_sprint5.js",
     "test:sprint6":    "node tests/test_sprint6.js",
     "migrate":         "node scripts/run_migrations.js",
+    "migrate:dashboard": "node scripts/run_migration.js",
     "deploy:check":    "node scripts/deploy_checklist.js",
     "setup:google":    "node scripts/google_oauth_setup.js",
     "create:merchant":  "node scripts/create_test_merchant.js",
-    "update:merchant":  "node scripts/update_test_merchant.js"
+    "update:merchant":  "node scripts/update_test_merchant.js",
+    "refresh:instagram": "node scripts/refresh_instagram_token.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

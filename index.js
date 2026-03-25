@@ -15,6 +15,18 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 // ── Middlewares ────────────────────────────────────────────────────────────────
+// CORS — autorise le dashboard local en développement
+app.use((req, res, next) => {
+  const origin = req.headers.origin || '';
+  const allowed = process.env.DASHBOARD_ORIGIN
+    || (origin.startsWith('http://localhost:') ? origin : 'http://localhost:5173');
+  res.setHeader('Access-Control-Allow-Origin', allowed);
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 // Capture du body brut (Buffer) avant parsing JSON.
 // Nécessaire pour valider la signature HMAC-SHA256 des webhooks Meta et Stripe.
 // Le Buffer est exposé sur req.rawBody pour être lu dans les webhooks.

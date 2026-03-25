@@ -5,6 +5,8 @@ const pool = require('../db/client');
 const { MAX_CONTEXT_MESSAGES, DEFAULT_SYSTEM_PROMPT, MESSAGE_ROLE } = require('../config/constants');
 const { generateSystemPrompt } = require('./generate_system_prompt');
 
+const FAQ_LIMIT = 30;
+
 // ── Récupération merchant ──────────────────────────────────────────────────────
 
 /**
@@ -28,6 +30,35 @@ async function fetchMerchant(merchantId) {
       error:      err.message,
     }));
     return null;
+  }
+}
+
+// ── Récupération FAQ ──────────────────────────────────────────────────────────
+
+/**
+ * Charge les FAQ_LIMIT entrées FAQ les plus consultées d'un merchant.
+ * Retourne un tableau vide en cas d'erreur (non bloquant).
+ *
+ * @param {string} merchantId
+ * @returns {Promise<Array<{question: string, answer: string}>>}
+ */
+async function fetchFaq(merchantId) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT question, answer FROM faq
+       WHERE merchant_id = $1
+       ORDER BY hit_count DESC
+       LIMIT $2`,
+      [merchantId, FAQ_LIMIT],
+    );
+    return rows;
+  } catch (err) {
+    console.error(JSON.stringify({
+      event:      'db_fetch_faq_error',
+      merchantId,
+      error:      err.message,
+    }));
+    return [];
   }
 }
 
@@ -91,15 +122,29 @@ async function fetchMessages(conversationId) {
  */
 async function buildContext(merchantId, conversationId, merchant = null) {
   // Chargements en parallèle pour minimiser la latence
-  const [resolvedMerchant, messages] = await Promise.all([
+  const [resolvedMerchant, messages, faqEntries] = await Promise.all([
     merchant ? Promise.resolve(merchant) : fetchMerchant(merchantId),
     fetchMessages(conversationId),
+    fetchFaq(merchantId),
   ]);
 
+  // Injection de la date du jour pour que Claude puisse résoudre "demain", "jeudi", etc.
+  const todayStr = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+  const dateContext = `\nAujourd'hui nous sommes le ${todayStr}. Pour les réservations, convertis toujours les jours relatifs ("demain", "jeudi"...) en date YYYY-MM-DD.`;
+
+  // Injection de la FAQ si des entrées existent
+  const faqContext = faqEntries.length > 0
+    ? '\n\nFAQ (utilise ces réponses en priorité si la question du client correspond) :\n' +
+      faqEntries.map((e) => `Q: ${e.question}\nR: ${e.answer}`).join('\n\n')
+    : '';
+
   // Fallback ultime si merchant introuvable (ne devrait pas arriver en prod)
-  const systemPrompt = resolvedMerchant
+  const basePrompt = resolvedMerchant
     ? generateSystemPrompt(resolvedMerchant)
     : DEFAULT_SYSTEM_PROMPT;
+  const systemPrompt = basePrompt + dateContext + faqContext;
 
   if (!resolvedMerchant) {
     console.warn(JSON.stringify({
@@ -114,6 +159,7 @@ async function buildContext(merchantId, conversationId, merchant = null) {
     merchantId,
     conversationId,
     messageCount:   messages.length,
+    faqCount:       faqEntries.length,
     usingFallback:  !resolvedMerchant,
   }));
 

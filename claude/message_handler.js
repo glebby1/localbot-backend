@@ -7,6 +7,7 @@ const { getOrCreateConversation, saveMessage,
         setConversationStatus }                     = require('./conversation_manager');
 const { extractReservationData, hasNeedsHuman,
         cleanResponseText }                         = require('./intent_detector');
+const { saveFaqSuggestion }                         = require('../db/faq_suggestion');
 const { createReservationEvent }                    = require('../calendar/create_event');
 const { saveReservation }                           = require('../calendar/save_reservation');
 const { sendReservationConfirmation }               = require('../notifications/send_confirmation');
@@ -74,6 +75,10 @@ async function handleMessage({ merchantId, merchant, customerPhone, messageText,
       'Question en attente de réponse manuelle',
       { conversationId, customerPhone, lastMessage: messageText },
     );
+    // Sauvegarder la question comme suggestion FAQ (non bloquant)
+    saveFaqSuggestion(merchantId, messageText, conversationId).catch((err) => {
+      console.error(JSON.stringify({ event: 'faq_suggestion_error', error: err.message }));
+    });
   }
 
   // 9. Détection [RESERVATION:...] — flux complet de réservation

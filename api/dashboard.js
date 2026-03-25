@@ -135,14 +135,26 @@ router.get('/merchant/:merchantId/stats', merchantRateLimiter(), async (req, res
 // ── GET /api/merchant/:merchantId/reservations ────────────────────────────────
 
 router.get('/merchant/:merchantId/reservations', merchantRateLimiter(), async (req, res) => {
-  const { merchantId } = req.params;
-  const { date }       = req.query;
+  const { merchantId }    = req.params;
+  const { date, from, to } = req.query;
 
   try {
     let rows;
 
-    if (date) {
-      // Réservations du jour exact
+    if (from && to) {
+      // Plage de dates (vue semaine / mois)
+      ({ rows } = await pool.query(
+        `SELECT r.*, c.channel
+         FROM reservation r
+         JOIN conversation c ON c.id = r.conversation_id
+         WHERE c.merchant_id = $1
+           AND booked_for::date >= $2::date
+           AND booked_for::date <= $3::date
+         ORDER BY booked_for ASC`,
+        [merchantId, from, to],
+      ));
+    } else if (date) {
+      // Jour exact
       ({ rows } = await pool.query(
         `SELECT r.*, c.channel
          FROM reservation r
@@ -153,7 +165,7 @@ router.get('/merchant/:merchantId/reservations', merchantRateLimiter(), async (r
         [merchantId, date],
       ));
     } else {
-      // 7 prochains jours
+      // 7 prochains jours (défaut)
       ({ rows } = await pool.query(
         `SELECT r.*, c.channel
          FROM reservation r
@@ -177,7 +189,7 @@ router.get('/merchant/:merchantId/reservations', merchantRateLimiter(), async (r
 
 router.get('/merchant/:merchantId/conversations', merchantRateLimiter(), async (req, res) => {
   const { merchantId }    = req.params;
-  const { status }        = req.query;
+  const { status, channel, period } = req.query;
   const limit             = parseInt(req.query.limit  ?? '20', 10);
   const offset            = parseInt(req.query.offset ?? '0',  10);
 
@@ -188,6 +200,16 @@ router.get('/merchant/:merchantId/conversations', merchantRateLimiter(), async (
     if (status) {
       conditions.push(`c.status = $${params.length + 1}`);
       params.push(status);
+    }
+
+    if (channel) {
+      conditions.push(`c.channel = $${params.length + 1}`);
+      params.push(channel);
+    }
+
+    if (period) {
+      const interval = periodToInterval(period);
+      conditions.push(`c.started_at >= now() - INTERVAL '${interval}'`);
     }
 
     const where = conditions.join(' AND ');
@@ -244,6 +266,30 @@ router.get('/merchant/:merchantId/conversations/:conversationId', merchantRateLi
     res.json({ conversation: conv, messages });
   } catch (err) {
     console.error(JSON.stringify({ event: 'api_conversation_detail_error', conversationId, error: err.message }));
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── PATCH /api/merchant/:merchantId/conversations/:conversationId ─────────────
+
+router.patch('/merchant/:merchantId/conversations/:conversationId', merchantRateLimiter(), async (req, res) => {
+  const { merchantId, conversationId } = req.params;
+  const { status } = req.body;
+
+  const ALLOWED = ['active', 'closed', 'needs_human'];
+  if (!ALLOWED.includes(status)) {
+    return res.status(400).json({ error: 'Statut invalide' });
+  }
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE conversation SET status = $1 WHERE id = $2 AND merchant_id = $3`,
+      [status, conversationId, merchantId],
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Conversation introuvable' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'api_conversation_patch_error', conversationId, error: err.message }));
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -395,6 +441,180 @@ router.patch('/merchant/:merchantId/notifications/:notificationId', merchantRate
     res.json({ success: true });
   } catch (err) {
     console.error(JSON.stringify({ event: 'api_notification_patch_error', notificationId, error: err.message }));
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── GET /api/merchant/:merchantId ─────────────────────────────────────────────
+
+router.get('/merchant/:merchantId', merchantRateLimiter(), async (req, res) => {
+  const { merchantId } = req.params;
+
+  try {
+    const { rows: [merchant] } = await pool.query(
+      `SELECT id, name, type, address, email, phone, hours, services, rules,
+              capacity, tone, use_emoji, vouvoyer, auto_reminder, system_prompt, plan
+       FROM merchant WHERE id = $1`,
+      [merchantId],
+    );
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+    res.json({ merchant });
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'api_merchant_get_error', merchantId, error: err.message }));
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── PATCH /api/merchant/:merchantId ───────────────────────────────────────────
+
+router.patch('/merchant/:merchantId', merchantRateLimiter(), async (req, res) => {
+  const { merchantId } = req.params;
+  const {
+    name, type, address, email, phone,
+    hours, services, rules, capacity,
+    tone, use_emoji, vouvoyer, auto_reminder,
+    system_prompt,
+  } = req.body;
+
+  const ALLOWED_TONES = ['chaleureux', 'neutre', 'professionnel'];
+  if (tone && !ALLOWED_TONES.includes(tone)) {
+    return res.status(400).json({ error: 'Ton invalide' });
+  }
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE merchant SET
+         name           = COALESCE($1,  name),
+         type           = COALESCE($2,  type),
+         address        = COALESCE($3,  address),
+         email          = COALESCE($4,  email),
+         phone          = COALESCE($5,  phone),
+         hours          = COALESCE($6,  hours),
+         services       = COALESCE($7,  services),
+         rules          = COALESCE($8,  rules),
+         capacity       = COALESCE($9,  capacity),
+         tone           = COALESCE($10, tone),
+         use_emoji      = COALESCE($11, use_emoji),
+         vouvoyer       = COALESCE($12, vouvoyer),
+         auto_reminder  = COALESCE($13, auto_reminder),
+         system_prompt  = COALESCE($14, system_prompt)
+       WHERE id = $15`,
+      [
+        name ?? null, type ?? null, address ?? null, email ?? null, phone ?? null,
+        hours ?? null, services ?? null, rules ?? null, capacity ?? null,
+        tone ?? null, use_emoji ?? null, vouvoyer ?? null, auto_reminder ?? null,
+        system_prompt ?? null,
+        merchantId,
+      ],
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Merchant introuvable' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'api_merchant_patch_error', merchantId, error: err.message }));
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── PATCH /api/merchant/:merchantId/reservations/:reservationId ───────────────
+
+router.patch('/merchant/:merchantId/reservations/:reservationId', merchantRateLimiter(), async (req, res) => {
+  const { merchantId, reservationId } = req.params;
+  const { status } = req.body;
+
+  const ALLOWED = ['confirmed', 'cancelled'];
+  if (!ALLOWED.includes(status)) {
+    return res.status(400).json({ error: 'Statut invalide' });
+  }
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE reservation SET status = $1
+       WHERE id = $2
+         AND conversation_id IN (
+           SELECT id FROM conversation WHERE merchant_id = $3
+         )`,
+      [status, reservationId, merchantId],
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'Réservation introuvable' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'api_reservation_patch_error', reservationId, error: err.message }));
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── DELETE /api/merchant/:merchantId/faq/:faqId ───────────────────────────────
+
+router.delete('/merchant/:merchantId/faq/:faqId', merchantRateLimiter(), async (req, res) => {
+  const { merchantId, faqId } = req.params;
+
+  try {
+    const { rowCount } = await pool.query(
+      `DELETE FROM faq WHERE id = $1 AND merchant_id = $2`,
+      [faqId, merchantId],
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'FAQ introuvable' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'api_faq_delete_error', faqId, error: err.message }));
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── PATCH /api/merchant/:merchantId/faq/:faqId ────────────────────────────────
+
+router.patch('/merchant/:merchantId/faq/:faqId', merchantRateLimiter(), async (req, res) => {
+  const { merchantId, faqId } = req.params;
+  const { question, answer }  = req.body;
+
+  if (!question || !answer) {
+    return res.status(400).json({ error: 'question and answer are required' });
+  }
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE faq SET question = $1, answer = $2 WHERE id = $3 AND merchant_id = $4`,
+      [question, answer, faqId, merchantId],
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'FAQ introuvable' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'api_faq_patch_error', faqId, error: err.message }));
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── GET /api/merchant/:merchantId/faq-suggestions ─────────────────────────────
+
+router.get('/merchant/:merchantId/faq-suggestions', merchantRateLimiter(), async (req, res) => {
+  const { merchantId } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, question, conversation_id, created_at
+       FROM faq_suggestion
+       WHERE merchant_id = $1
+       ORDER BY created_at DESC`,
+      [merchantId],
+    );
+    res.json({ suggestions: rows });
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'api_faq_suggestions_error', merchantId, error: err.message }));
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── DELETE /api/merchant/:merchantId/faq-suggestions/:suggestionId ────────────
+
+router.delete('/merchant/:merchantId/faq-suggestions/:suggestionId', merchantRateLimiter(), async (req, res) => {
+  const { merchantId, suggestionId } = req.params;
+  try {
+    await pool.query(
+      `DELETE FROM faq_suggestion WHERE id = $1 AND merchant_id = $2`,
+      [suggestionId, merchantId],
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(JSON.stringify({ event: 'api_faq_suggestion_delete_error', suggestionId, error: err.message }));
     res.status(500).json({ error: 'Internal server error' });
   }
 });
